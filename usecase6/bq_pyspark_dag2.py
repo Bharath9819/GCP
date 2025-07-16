@@ -1,0 +1,35 @@
+#Import of libraries
+import os
+import datetime
+from airflow import models
+from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitJobOperator
+from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateEmptyDatasetOperator
+from airflow.utils.dates import days_ago
+
+#Default arguments with necessary project specific values captured
+PROJECT_ID = "deai-2025"
+CLUSTER_NAME="singlenode-dplr-cluster"
+REGION = "us-central1"
+ZONE = "us-central1-a"
+PYSPARK_CODE1_URI = "gs://inceptez-usecases-bucket/code/usecase6/code_Usecase6_step1_gcs_bq.py"#this code is kept in your bucket location
+
+default_args = {"start_date": days_ago(1),"project_id": PROJECT_ID,}
+
+#Instantiate the DAG class in a form of dag object
+#Context Manager way of instanti
+with models.DAG(
+    "DAG-create-bqdataset-PySpark-LR",
+    default_args=default_args,
+    schedule_interval=datetime.timedelta(days=1),  
+    #schedule_interval="*/5 * * * *",  
+) as dag:
+   
+   pyspark_job_params = {
+   "reference": {"project_id": PROJECT_ID},
+   "placement": {"cluster_name": CLUSTER_NAME},
+   "pyspark_job": {"main_python_file_uri": PYSPARK_CODE1_URI},}
+   
+   bigquery_task0 = BigQueryCreateEmptyDatasetOperator(task_id="bigquery_task0", dataset_id='rawds1')
+   pyspark_task1 = DataprocSubmitJobOperator(task_id="pyspark_task1", job=pyspark_job_params, region=REGION, project_id=PROJECT_ID)   
+   
+   bigquery_task0 >> pyspark_task1
